@@ -190,6 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_episode', default=100, type=int, help='number of episodes/iteration')
     parser.add_argument('--path_length', default=200, type=int, help='number of steps')
     parser.add_argument('--learning_rate', default=0.01, help='learning rate for Adam Optimizer')
+    parser.add_argument('--env', default='CartPole-v0', help='gym environment for training')
     parser.add_argument('--algorithm', default='Vanilla Policy Gradient', help='algorithm identifier')
     parser.add_argument('--outdir', default='vanilla-policy-gradient-CartPole-v0', type=str, help='output directory where results are saved (/tmp/ prefixed)')
     parser.add_argument('--upload', action='store_true', help='upload results via OpenAI Gym API')
@@ -199,7 +200,7 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     tf.set_random_seed(args.seed)
 
-    env = gym.make('CartPole-v0')
+    env = gym.make(args.env)
     outdir = '/tmp/' + args.outdir
     env.monitor.start(outdir, force=True)
 
