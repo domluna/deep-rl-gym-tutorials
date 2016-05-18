@@ -88,8 +88,9 @@ class CategoricalPolicy(object):
             # log_lik = tf.log(tf.gather_nd(probs, inds))
 
             idxs_flattened = tf.range(0, tf.shape(probs)[0]) * tf.shape(probs)[1] + self._actions
-            log_lik = tf.log(tf.gather(tf.reshape(probs, [-1]), idxs_flattened) + 1e-8)
+            probs_vec = tf.gather(tf.reshape(probs, [-1]), idxs_flattened)
 
+        log_lik = tf.log(probs_vec + 1e-8)
 
         act_op = probs[0, :]
         surr_loss = -tf.reduce_mean(log_lik * self._advantages, name="loss_op")
