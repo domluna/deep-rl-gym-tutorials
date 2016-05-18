@@ -81,12 +81,14 @@ class CategoricalPolicy(object):
         h1 = tf.contrib.layers.fully_connected(self._observations, hidden_dim, activation_fn=tf.tanh)
         probs = tf.contrib.layers.fully_connected(h1, out_dim, activation_fn=tf.nn.softmax)
 
-        # NOTE: Doesn't currently work due to gather_nd gradient not being currently implemented
-        # inds = tf.transpose(tf.pack([tf.range(tf.shape(probs)[0]), self._actions]))
-        # log_lik = tf.log(tf.gather_nd(probs, inds))
+        # I believe this is faster if on the CPU
+        with tf.device("/cpu:0"):
+            # NOTE: Doesn't currently work due to gather_nd gradient not being currently implemented
+            # inds = tf.transpose(tf.pack([tf.range(tf.shape(probs)[0]), self._actions]))
+            # log_lik = tf.log(tf.gather_nd(probs, inds))
 
-        idxs_flattened = tf.range(0, tf.shape(probs)[0]) * tf.shape(probs)[1] + self._actions
-        log_lik = tf.log(tf.gather(tf.reshape(probs, [-1]), idxs_flattened) + 1e-8)
+            idxs_flattened = tf.range(0, tf.shape(probs)[0]) * tf.shape(probs)[1] + self._actions
+            log_lik = tf.log(tf.gather(tf.reshape(probs, [-1]), idxs_flattened) + 1e-8)
 
 
         act_op = probs[0, :]
@@ -103,7 +105,7 @@ class CategoricalPolicy(object):
         # expect observation to be shape(1, self.observation_space)
         a = self._sess.run(self._act_op, feed_dict={self._observations: observation})
         cs = np.cumsum(a)
-        idx = sum(cs < np.random.rand())
+        idx = sum(cs < np.random.rand(len(cs)))
         return idx
 
     def train(self, observations, actions, advantages):
@@ -191,8 +193,8 @@ if __name__ == '__main__':
     parser.add_argument('--path_length', default=200, type=int, help='number of steps')
     parser.add_argument('--learning_rate', default=0.01, help='learning rate for Adam Optimizer')
     parser.add_argument('--env', default='CartPole-v0', help='gym environment for training')
-    parser.add_argument('--algorithm', default='Vanilla Policy Gradient', help='algorithm identifier')
-    parser.add_argument('--outdir', default='vanilla-policy-gradient-CartPole-v0', type=str, help='output directory where results are saved (/tmp/ prefixed)')
+    parser.add_argument('--algorithm', default='VPG', help='algorithm identifier')
+    parser.add_argument('--outdir', default='vpg', type=str, help='output directory where results are saved (/tmp/{outdir}-{env} )')
     parser.add_argument('--upload', action='store_true', help='upload results via OpenAI Gym API')
     parser.add_argument('--seed', default=0, type=int, help='random seed')
     args = parser.parse_args()
@@ -201,8 +203,10 @@ if __name__ == '__main__':
     tf.set_random_seed(args.seed)
 
     env = gym.make(args.env)
-    outdir = '/tmp/' + args.outdir
+    outdir = '/tmp/' + args.outdir + '-' + args.env
     env.monitor.start(outdir, force=True)
+
+    print("******* WILL SAVE RESULTS TO", outdir, " *******")
 
     sess = tf.Session()
 
