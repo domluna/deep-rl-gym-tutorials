@@ -86,15 +86,17 @@ class CategoricalPolicy(object):
         # log_lik = tf.log(tf.gather_nd(probs, inds))
 
         idxs_flattened = tf.range(0, tf.shape(probs)[0]) * tf.shape(probs)[1] + self._actions
-        log_lik = -tf.log(tf.gather(tf.reshape(probs, [-1]), idxs_flattened) + 1e-8)
+        log_lik = tf.log(tf.gather(tf.reshape(probs, [-1]), idxs_flattened) + 1e-8)
 
 
         act_op = probs[0, :]
-        loss_op = tf.reduce_mean(log_lik * self._advantages, name="loss_op")
-        train_op = self._opt.minimize(loss_op, name="train_op")
+        surr_loss = -tf.reduce_mean(log_lik * self._advantages, name="loss_op")
+
+        grads_and_vars = self._opt.compute_gradients(surr_loss)
+        train_op = self._opt.apply_gradients(grads_and_vars, name="train_op")
 
         self._act_op = act_op
-        self._loss_op = loss_op
+        self._loss_op = surr_loss
         self._train_op = train_op
 
     def act(self, observation):
@@ -212,8 +214,6 @@ if __name__ == '__main__':
     po = PolicyOptimizer(env, policy, 0, args.n_iter, args.n_episode, args.path_length)
 
     sess.run(tf.initialize_all_variables())
-
-    print(sess.run(tf.trainable_variables()))
 
     # train the policy optimizer
     po.train()
