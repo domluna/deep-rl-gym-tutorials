@@ -224,6 +224,7 @@ if __name__ == '__main__':
     # train the policy optimizer
     po.train()
 
+    sess.close()
     env.monitor.close()
 
     # make sure to setup your OPENAI_GYM_API_KEY environment variable
