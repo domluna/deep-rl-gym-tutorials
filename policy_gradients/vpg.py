@@ -39,7 +39,6 @@ Map s (state) to an output vector u
 3. If a is binary valued, we use a single output, the probability of outputting 1 (although
 we could also just use 1.)
 
-TODO: implement baseline
 TODO: implement generalized advantage estimation
 """
 from __future__ import absolute_import
@@ -146,28 +145,20 @@ class PolicyOptimizer(object):
             observations=np.array(obs),
             actions=np.array(actions),
             rewards=np.array(rewards),
+            returns=discount_cumsum(rewards, self.gamma)
         )
 
     def process_paths(self, paths):
-        for p in paths:
-            # TODO: compute baseline
-            # b = self.baseline.predict(p)
-            b = 0
-            r = discount_cumsum(p["rewards"], self.gamma)
-            a = r - b
-
-            p["returns"] = r
-            # p["advantages"] = (a - a.mean()) / (a.std() + 1e-8) # normalize
-            p["advantages"] = a
-            p["baselines"] = b
+        maxlen = max(len(p['returns']) for p in paths)
+        padded_returns = [np.concatenate([p['returns'], np.zeros(maxlen-len(p['returns']))]) for p in paths]
+        # baseline for each timestep
+        baselines = np.mean(padded_returns, axis=0)
+        advantages = [p['returns'] - baselines[:len(p['returns'])] for p in paths]
 
         obs = np.concatenate([ p["observations"] for p in paths ])
         actions = np.concatenate([ p["actions"] for p in paths ])
         rewards = np.concatenate([ p["rewards"] for p in paths ])
-        advantages = np.concatenate([ p["advantages"] for p in paths ])
-
-        # TODO: fit baseline
-        # self.baseline.fit(paths)
+        advantages = np.concatenate([ a for a in advantages ])
 
         return dict(
             observations=obs,

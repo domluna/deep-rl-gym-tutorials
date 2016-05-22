@@ -42,7 +42,7 @@ import argparse
 
 class DeepmindDQN(object):
     """
-    input 84 x 84 x 4 (image is 84x84)
+    input 4 x 84 x 84 (image is 84x84)
     32 filters 8 x 8 stride 4
     64 filters 4 x 4 stride 2
     64 filters 3 x 3 stride 1
