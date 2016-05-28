@@ -76,9 +76,10 @@ with tf.Graph().as_default():
     K.set_session(sess)
 
     main = atari_cnn(input_shape, n_actions)
-    target = atari_cnn(input_shape, n_actions)
     adam = Adam(lr=learning_rate)
     main.compile(optimizer=adam, loss='mse')
+
+    target = atari_cnn(input_shape, n_actions)
     target.set_weights(main.get_weights())
 
     obs_preprocess = process_img(84, 84, sess)
@@ -91,10 +92,10 @@ with tf.Graph().as_default():
     obs = obs_preprocess(obs)
     for _ in range(batch_size):
         action = np.random.choice(n_actions)
-        obs_next, reward, done, _ = env.step(action)
-        obs_next = obs_preprocess(obs_next)
-        er.add((obs, action, reward, obs_next, done))
-        obs = obs_next
+        next_obs, reward, done, _ = env.step(action)
+        next_obs = obs_preprocess(next_obs)
+        er.add((obs, action, reward, next_obs, done))
+        obs = next_obs
 
     ql = DDQN(main, target, env, er, obs_preprocess, 
             batch_size=batch_size,

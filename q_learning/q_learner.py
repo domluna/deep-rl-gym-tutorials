@@ -52,7 +52,7 @@ class DDQN:
         actions = Counter()
 
         while not done and t < self.max_path_length:
-            obs, done, info = self.run_step(obs)
+            obs, done, info = self.step(obs)
             total_reward += info['reward']
             losses.append(info['loss'])
             actions[info['action']] += 1
@@ -65,26 +65,32 @@ class DDQN:
 
         return losses, total_reward
 
-    def run_step(self, obs):
+    def step(self, obs):
         if np.random.rand() < self.epsilon:
             action = np.random.choice(self.n_actions)
         else:
             qvals = self.main.predict(obs, batch_size=1)
             action = np.argmax(qvals)
-        obs_next, reward, done, _ = self.env.step(action)
+        next_obs, reward, done, _ = self.env.step(action)
 
         if self.obs_preprocess:
-            obs_next = self.obs_preprocess(obs_next)
+            next_obs = self.obs_preprocess(next_obs)
 
-        self.experience_replay.add((obs, action, reward, obs_next, done))
-        obs = obs_next
+        self.experience_replay.add((obs, action, reward, next_obs, done))
+        obs = next_obs
 
-        b_obs, _, b_reward, b_obs_next, b_done = self.experience_replay.sample(self.batch_size)
+        b_obs, _, b_reward, b_next_obs, b_done = self.experience_replay.sample(self.batch_size)
 
         # TODO: problem here, the loss is always super small
+        # qmain_next is just 0s for some reason
+        # but argmax will pick the first action in that case
+        # which is 0, that's y we got so many zeros.
+        #
+        # the real question is y is qmain_next always 0
         # DDQN loss calculation
-        qmain_next = self.main.predict_on_batch(b_obs_next)
-        qtarget_next = self.target.predict_on_batch(b_obs_next)
+        # TODO: change variable name?
+        qmain_next = self.main.predict_on_batch(b_next_obs)
+        qtarget_next = self.target.predict_on_batch(b_next_obs)
         a_max = np.argmax(qmain_next, axis=1)
 
         # print('main', qmain_next)
@@ -92,7 +98,6 @@ class DDQN:
 
         y = b_reward + (self.gamma * ~b_done * qtarget_next[range(self.batch_size), a_max])
         y_sparse = np.zeros_like(qtarget_next)
-        y_sparse[range(self.batch_size), a_max] = y
 
         # qtarget_next[range(self.batch_size), a_max] = y
         y_sparse[range(self.batch_size), a_max] = y
