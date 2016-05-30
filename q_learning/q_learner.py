@@ -45,14 +45,14 @@ class DDQN:
         if self.obs_preprocess:
             obs = self.obs_preprocess(obs)
 
-        done = False
+        terminal = False
         losses = []
         total_reward = 0
         t = 0
         actions = Counter()
 
-        while not done and t < self.max_path_length:
-            obs, done, info = self.step(obs)
+        while not terminal and t < self.max_path_length:
+            obs, terminal, info = self.step(obs)
             total_reward += info['reward']
             losses.append(info['loss'])
             actions[info['action']] += 1
@@ -71,38 +71,35 @@ class DDQN:
         else:
             qvals = self.main.predict(obs, batch_size=1)
             action = np.argmax(qvals)
-        next_obs, reward, done, _ = self.env.step(action)
+        next_obs, reward, terminal, _ = self.env.step(action)
 
         if self.obs_preprocess:
             next_obs = self.obs_preprocess(next_obs)
 
-        self.experience_replay.add((obs, action, reward, next_obs, done))
+        self.experience_replay.add((obs, action, reward, next_obs, terminal))
         obs = next_obs
 
-        b_obs, _, b_reward, b_next_obs, b_done = self.experience_replay.sample(self.batch_size)
+        b_obs, b_action, b_reward, b_next_obs, b_terminal = self.experience_replay.sample(self.batch_size)
 
-        # TODO: problem here, the loss is always super small
-        # qmain_next is just 0s for some reason
-        # but argmax will pick the first action in that case
-        # which is 0, that's y we got so many zeros.
-        #
-        # the real question is y is qmain_next always 0
         # DDQN loss calculation
-        # TODO: change variable name?
-        qmain_next = self.main.predict_on_batch(b_next_obs)
-        qtarget_next = self.target.predict_on_batch(b_next_obs)
-        a_max = np.argmax(qmain_next, axis=1)
+        main_qvals = self.main.predict_on_batch(b_obs)
+        next_main_qvals = self.main.predict_on_batch(b_next_obs)
+        next_target_qvals = self.target.predict_on_batch(b_next_obs)
+        a_max = np.argmax(next_main_qvals, axis=1)
 
-        # print('main', qmain_next)
-        # print('target', qtarget_next)
+        # print('main', main_qvals)
+        # print('next main', next_main_qvals)
+        # print('next target', next_target_qvals)
 
-        y = b_reward + (self.gamma * ~b_done * qtarget_next[range(self.batch_size), a_max])
-        y_sparse = np.zeros_like(qtarget_next)
+        y = b_reward + ~b_terminal * (self.gamma * next_target_qvals[range(self.batch_size), a_max])
+        main_qvals[range(self.batch_size), b_action] = y
 
-        # qtarget_next[range(self.batch_size), a_max] = y
-        y_sparse[range(self.batch_size), a_max] = y
+        # print('a max', a_max)
+        # print('reward', b_reward)
 
-        loss = self.main.train_on_batch(b_obs, y_sparse)
+        loss = self.main.train_on_batch(b_obs, main_qvals)
+        # print('loss', loss)
+        # print('**************************')
 
         # Updates
         self.steps_taken += 1
@@ -110,4 +107,4 @@ class DDQN:
             print("Updating target weights, self.steps_taken", self.steps_taken)
             self.target.set_weights(self.main.get_weights())
 
-        return obs, done, dict(loss=loss, action=action, reward=reward)
+        return obs, terminal, dict(loss=loss, action=action, reward=reward)

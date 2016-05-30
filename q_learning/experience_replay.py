@@ -14,7 +14,7 @@ class ExperienceReplay(object):
         Add an experience to the experience replay.
 
         An experience should be a tuple of the form:
-            (observation, action, reward, next_observation, done)
+            (observation, action, reward, next_observation, terminal)
         """
         raise NotImplementedError
 
@@ -38,9 +38,9 @@ class SimpleExperienceReplay(ExperienceReplay):
         actions = np.array([e[1] for e in experiences])
         rewards = np.array([e[2] for e in experiences])
         next_obs = np.concatenate([e[3] for e in experiences])
-        done = np.array([e[4] for e in experiences])
+        terminal = np.array([e[4] for e in experiences])
 
-        return obs, actions, rewards, next_obs, done
+        return obs, actions, rewards, next_obs, terminal
 
     @property
     def capacity(self):

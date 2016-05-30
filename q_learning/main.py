@@ -62,7 +62,7 @@ replay_capacity = 100000
 episodes = 100
 input_shape = (84, 84, 1)
 # input_shape = (210, 160, 3)
-learning_rate = 0.00025
+learning_rate = 1e-3
 batch_size = 32
 max_path_length = 200
 n_actions = env.action_space.n
@@ -83,6 +83,7 @@ with tf.Graph().as_default():
     target.set_weights(main.get_weights())
 
     obs_preprocess = process_img(84, 84, sess)
+    # obs_preprocess = lambda x : x.reshape((1,) + x.shape)
 
     # setup experience replay and initialize with some
     # random experiences
@@ -101,8 +102,6 @@ with tf.Graph().as_default():
             batch_size=batch_size,
             max_path_length=max_path_length,
             epsilon=epsilon) 
-
-    sess.run(tf.initialize_all_variables())
 
     for i in range(episodes):
         loss, episode_reward = ql.run_episode(render)
