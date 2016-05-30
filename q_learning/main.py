@@ -30,7 +30,7 @@ from __future__ import division
 
 from models import atari_cnn
 from six.moves import range
-from q_learner import DDQN
+from agents import DDQN
 from experience_replay import SimpleExperienceReplay
 from keras import backend as K
 from keras.optimizers import Adam
@@ -63,15 +63,14 @@ outdir = '/tmp/dump'
 env.monitor.start(outdir, force=True)
 
 replay_capacity = 100000
+replay_start = 10000
 episodes = 10
 input_shape = (84, 84, 1)
-# input_shape = (210, 160, 3)
 learning_rate = 1e-3
 batch_size = 32
 max_path_length = 1000
 n_actions = env.action_space.n
 gamma = .99
-# epsilon = tf.Variable(1.0, trainable=False, name='epsilon')
 epsilon = 1.0
 
 with tf.Graph().as_default():
@@ -87,7 +86,6 @@ with tf.Graph().as_default():
 
     obs_preprocess = process_img(84, 84, sess)
     clip = lambda x: np.clip(x, -1.0, 1.0)
-    # obs_preprocess = lambda x : x.reshape((1,) + x.shape)
 
     # setup experience replay and initialize with some
     # random experiences
@@ -95,7 +93,7 @@ with tf.Graph().as_default():
 
     obs = env.reset()
     obs = obs_preprocess(obs)
-    for _ in range(batch_size):
+    for _ in range(replay_start):
         action = np.random.randint(n_actions)
         next_obs, reward, done, _ = env.step(action)
         next_obs = obs_preprocess(next_obs)
@@ -109,14 +107,14 @@ with tf.Graph().as_default():
             max_path_length=max_path_length,
             epsilon=epsilon) 
 
-    ql.play()
 
     for i in range(episodes):
 
-        # no-op actions
-        for _ in range(30):
-            action = np.random.randint(n_actions)
-            next_obs, reward, done, _ = env.step(action)
+        # no-op actions, upto 30
+        obs = env.reset()
+        obs = obs_preprocess(obs)
+        for _ in range(np.random.randint(1, 30)):
+            next_obs, reward, done, _ = env.step(0)
             next_obs = obs_preprocess(next_obs)
             replay_mem.add((obs, action, reward, next_obs, done))
             obs = next_obs
@@ -131,6 +129,8 @@ with tf.Graph().as_default():
         print("Episode loss stddev:", ls)
         print("Episode total reward:", episode_reward)
         print("************************")
+
+    ql.play()
 
     sess.close()
     env.monitor.close()
