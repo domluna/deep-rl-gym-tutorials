@@ -27,7 +27,8 @@ class ExperienceReplay(object):
 class SimpleExperienceReplay(ExperienceReplay):
 
     def __init__(self, capacity):
-        self.replay = deque([], capacity)
+        # self.replay = deque([], capacity)
+        self.replay = []
 
     def add(self, experience):
         self.replay.append(experience)

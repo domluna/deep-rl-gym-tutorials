@@ -50,6 +50,10 @@ def process_img(new_height, new_width, session):
         return bilinear
     return lambda img: session.run(_f(img))
 
+def clipped_mse(y_true, y_pred):
+    err = K.mean(K.square(y_pred - y_true), axis=-1)
+    return K.clip(err, -1.0, 1.0)
+
 np.random.seed(0)
 tf.set_random_seed(0)
 random.seed(0)
@@ -59,17 +63,16 @@ outdir = '/tmp/dump'
 env.monitor.start(outdir, force=True)
 
 replay_capacity = 100000
-episodes = 100
+episodes = 10
 input_shape = (84, 84, 1)
 # input_shape = (210, 160, 3)
 learning_rate = 1e-3
 batch_size = 32
-max_path_length = 200
+max_path_length = 1000
 n_actions = env.action_space.n
 gamma = .99
 # epsilon = tf.Variable(1.0, trainable=False, name='epsilon')
-epsilon = 0.1
-render = True
+epsilon = 1.0
 
 with tf.Graph().as_default():
     sess = tf.Session()
@@ -77,34 +80,48 @@ with tf.Graph().as_default():
 
     main = atari_cnn(input_shape, n_actions)
     adam = Adam(lr=learning_rate)
-    main.compile(optimizer=adam, loss='mse')
+    main.compile(optimizer=adam, loss=clipped_mse)
 
     target = atari_cnn(input_shape, n_actions)
     target.set_weights(main.get_weights())
 
     obs_preprocess = process_img(84, 84, sess)
+    clip = lambda x: np.clip(x, -1.0, 1.0)
     # obs_preprocess = lambda x : x.reshape((1,) + x.shape)
 
     # setup experience replay and initialize with some
     # random experiences
-    er = SimpleExperienceReplay(replay_capacity)
+    replay_mem = SimpleExperienceReplay(replay_capacity)
 
     obs = env.reset()
     obs = obs_preprocess(obs)
     for _ in range(batch_size):
-        action = np.random.choice(n_actions)
+        action = np.random.randint(n_actions)
         next_obs, reward, done, _ = env.step(action)
         next_obs = obs_preprocess(next_obs)
-        er.add((obs, action, reward, next_obs, done))
+        replay_mem.add((obs, action, reward, next_obs, done))
         obs = next_obs
 
-    ql = DDQN(main, target, env, er, obs_preprocess, 
+    ql = DDQN(main, target, env, replay_mem, 
+            observation_preprocess=obs_preprocess, 
+            reward_clip=clip,
             batch_size=batch_size,
             max_path_length=max_path_length,
             epsilon=epsilon) 
 
+    ql.play()
+
     for i in range(episodes):
-        loss, episode_reward = ql.run_episode(render)
+
+        # no-op actions
+        for _ in range(30):
+            action = np.random.randint(n_actions)
+            next_obs, reward, done, _ = env.step(action)
+            next_obs = obs_preprocess(next_obs)
+            replay_mem.add((obs, action, reward, next_obs, done))
+            obs = next_obs
+
+        loss, episode_reward = ql.run_episode()
         lm = np.mean(loss)
         ls = np.std(loss)
 
