@@ -3,59 +3,58 @@ from __future__ import print_function
 from __future__ import division
 
 from collections import deque
-from six.moves import range
 
 import numpy as np
-import random
 
 class ExperienceReplay(object):
-    def add(self, experience):
-        """
-        Add an experience to the experience replay.
 
-        An experience should be a tuple of the form:
-            (observation, action, reward, next_observation, terminal)
-        """
-        raise NotImplementedError
+    def __init__(self, capacity, batch_size, observation_shape):
+        self.capacity = capacity
+        self.batch_size = batch_size
+        self.index = 0
+        self.size = 0
 
-    def sample(self, batch_size):
-        """
-        Sample `batch_size` experiences for the experience replay
-        """
-        raise NotImplementedError
+        obs_memory_shape = [capacity] + list(observation_shape)
+        obs_buffer_shape = [batch_size] + list(observation_shape)
 
-class SimpleExperienceReplay(ExperienceReplay):
+        # memory
+        self.obs = np.zeros(obs_memory_shape, dtype=np.float32)
+        self.next_obs = np.zeros(obs_memory_shape, dtype=np.float32)
+        self.actions = np.zeros(capacity, dtype=np.uint8)
+        self.rewards = np.zeros(capacity, dtype=np.float32)
+        self.terminals = np.zeros(capacity, dtype=np.bool)
 
-    def __init__(self, capacity):
-        # self.replay = deque([], capacity)
-        self.replay = []
+        # buffer
+        self.b_obs = np.zeros(obs_buffer_shape, dtype=np.float32)
+        self.b_next_obs = np.zeros(obs_buffer_shape, dtype=np.float32)
+        self.b_actions = np.zeros(batch_size, dtype=np.uint8)
+        self.b_rewards = np.zeros(batch_size, dtype=np.float32)
+        self.b_terminals = np.zeros(batch_size, dtype=np.bool)
 
-    def add(self, experience):
-        self.replay.append(experience)
-
-    def sample(self, batch_size):
-        experiences = random.sample(self.replay, batch_size)
-        obs = np.concatenate([e[0] for e in experiences])
-        actions = np.array([e[1] for e in experiences])
-        rewards = np.array([e[2] for e in experiences])
-        next_obs = np.concatenate([e[3] for e in experiences])
-        terminal = np.array([e[4] for e in experiences])
-
-        return obs, actions, rewards, next_obs, terminal
-
-    @property
-    def capacity(self):
-        return self.replay.maxlen
-
-# TODO: implement this
-class PrioritizedExperienceReplay(ExperienceReplay):
-
-    def __init__(self):
-        raise NotImplementedError
 
     def add(self, experience):
-        raise NotImplementedError
+        obs, action, reward, next_obs, terminal = experience
 
-    def sample(self, batch_size):
-        raise NotImplementedError
+        self.obs[self.index, ...] = obs
+        self.next_obs[self.index, ...] = next_obs
+        self.actions[self.index] = action
+        self.rewards[self.index] = reward
+        self.terminals[self.index] = terminal
+
+        self.index = (self.index + 1) % self.capacity
+        if self.size < self.capacity: self.size += 1
+
+    def sample(self):
+        ints = np.random.choice(self.size, self.batch_size, False)
+
+        self.b_obs[...] = self.obs[ints, ...]
+        self.b_obs_next[...] = self.obs_next[ints, ...]
+        self.b_actions[...] = self.actions[ints]
+        self.b_rewards[...] = self.reward[ints]
+        self.b_terminals[...] = self.terminals[ints]
+
+        return self.b_obs, self.b_actions, self.b_rewards, self.b_next_obs, self.b_terminals
+
+
+
 
