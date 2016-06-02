@@ -7,10 +7,11 @@ from __future__ import division
 from six.moves import range
 from keras import backend as K
 from keras.optimizers import Adam
-from collections import Counter
+from skimage.color import rgb2gray
+from skimage.transform import resize
 
 from agents import DDQN
-from memory import SimpleExperienceReplay
+from memory import SimpleExperienceReplay, Buffer
 from models import atari_cnn
 from environments import Env
 
@@ -21,64 +22,56 @@ import argparse
 import random
 
 seed = 0
+total_steps = 1000000
 replay_capacity = 100000
-replay_start = 1000
+replay_start = 10000
 target_update_frec = 10000
-episodes = 50
+save_model_freq = 50000
 history_window = 4
 height = 84
 width = 84
 network_input_shape = (history_window, height, width)
-learning_rate = 1e-3
+learning_rate = 1e-4
 batch_size = 32
-
-# DDQN specific
 gamma = .99
 
-# steps to train for
-total_steps = 100000
-
-# observation pre-processing
-def rgb2y_resize(input_shape, new_height, new_width, session):
-    img = tf.placeholder(tf.float32, shape=input_shape)
-    reshaped = tf.reshape(img, [1] + list(input_shape))
-    rgb2y = tf.image.rgb_to_grayscale(reshaped)
-    bilinear = tf.image.resize_bilinear(rgb2y, [new_height, new_width])
-    squeezed = tf.squeeze(bilinear)
-    return lambda x: session.run(squeezed, feed_dict={img: x})
+def preprocess(observation, new_height, new_width):
+    return resize(rgb2gray(observation), (new_height, new_width))
 
 def clipped_mse(y_true, y_pred):
     """MSE clipped into [1.0, 1.0] range"""
     err = K.mean(K.square(y_pred - y_true), axis=-1)
     return K.clip(err, -1.0, 1.0)
 
-def play(ql, env, epsilon=0.05, render=True):
-    obs = self.env.reset()
-
-    actions = Counter()
+def play(ql, env, buffer, epsilon=0.05, render=True):
     terminal = False
-    total_reward = 0
+    episode_reward = 0
     t = 0
+    buffer.reset()
+    obs = env.reset()
+    buffer.add(obs)
 
     while not terminal:
-        action = ql.predict_action(obs, epsilon)
+        if render: env.render()
+        action = ql.predict_action(buffer.observations, epsilon)
         obs, reward, terminal, _ = env.step(action)
-        total_reward += reward
-        actions[action] += 1
-        if t % 3 == 0: self.env.render()
+        buffer.add(obs)
+        episode_reward += reward
         t += 1
 
-    print('Action statistics:', actions)
+    print("Episode Reward {}".format(episode_reward))
 
-def noop_start(env, replay, max_actions=30):
+def noop_start(env, replay, buffer, max_actions=30):
     """
     SHOULD BE RUN AT THE START OF AN EPISODE
     """
     obs = env.reset()
     for _ in range(np.random.randint(replay.history_window, max_actions)):
         next_obs, reward, terminal, _ = env.step(0)
-        replay.add((obs, action, reward, terminal))
+        replay.add((obs, 0, reward, terminal))
+        buffer.add(obs)
         obs = next_obs
+    return obs
 
 def random_start(env, replay, n):
     """Add `n` random actions to the Replay Experience.
@@ -102,30 +95,30 @@ n_actions = gym_env.action_space.n
 observation_shape = gym_env.observation_space.shape
 # outdir = '/tmp/DDQN-Atari'
 # gym_env.monitor.start(outdir, force=True)
+save_path = '/tmp/atari.ckpt'
 
 # seed all the things! DJ Khaled says this is a "major key"
-np.random.seed(0)
-random.seed(0)
-tf.set_random_seed(0)
-gym_env.seed(0)
-
-# saver = tf.train.Saver()
+np.random.seed(seed)
+random.seed(seed)
+tf.set_random_seed(seed)
+gym_env.seed(seed)
 
 with tf.Graph().as_default():
     sess = tf.Session()
     K.set_session(sess)
 
-    obs_preprocess = rgb2y_resize(observation_shape, height, width, sess)
-    reward_clip = lambda x: np.clip(x, -1.0, 1.0)
     epsilon_decay = lambda t: max(0.1, 1.0 - (t/(total_steps+1)))
-    env = Env(gym_env, obs_preprocess, reward_clip)
-
     main = atari_cnn(network_input_shape, n_actions)
     target = atari_cnn(network_input_shape, n_actions)
     adam = Adam(lr=learning_rate)
     main.compile(optimizer=adam, loss=clipped_mse)
+    saver = tf.train.Saver()
 
-    replay = SimpleExperienceReplay(replay_capacity, batch_size, history_window, height, width)
+    replay = SimpleExperienceReplay(replay_capacity, batch_size, history_window, (height, width))
+    buffer = Buffer(history_window, (height, width))
+    obs_preprocess = lambda i: preprocess(i, height, width)
+    reward_clip = lambda r: np.clip(r, -1.0, 1.0)
+    env = Env(gym_env, obs_preprocess, reward_clip)
 
     # and initialize replay with some random experiences
     print("Initializing replay with {} experiences".format(replay_start))
@@ -138,46 +131,43 @@ with tf.Graph().as_default():
     terminal = False
     episode_reward = 0
     episode_n = 1
+    episode_len = 0
 
-    obs = env.reset()
+    # resets env and does NOOP (0) actions
+    obs = noop_start(env, replay, buffer)
     for t in range(1, total_steps+1):
-
-        env.render()
-
-        epsilon = epsilon_decay(t)
-        print(epsilon)
-
-        # TODO: make obs (history_window, width, height)
-        action = ql.predict_action(obs, epsilon)
-        obs_next, reward, terminal, _ = env.step(action)
-        replay.add((obs, action, reward, terminal))
-
-        batch = replay.sample()
-        ql.train_on_batch(batch)
-
         if terminal:
             print("************************")
             print("Episode: {}".format(episode_n))
             print("Episode total reward = {}".format(episode_reward))
-            print()
+            print("Number of actions taken during episode = {}".format(episode_len))
 
             episode_n += 1
             episode_reward = 0
-            terminal = False
+            episode_len = 0
+            obs = noop_start(env, replay, buffer)
 
-            # resets env and does NOOP (0) actions
-            noop_start(env, replay)
-        else:
-            obs = obs_next
-            episode_reward += reward
+        epsilon = epsilon_decay(t)
+
+        buffer.add(obs)
+        action = ql.predict_action(buffer.observations, epsilon)
+        obs_next, reward, terminal, _ = env.step(action)
+        replay.add((obs, action, reward, terminal))
+        episode_reward += reward
+        episode_len += 1
+        obs = obs_next
+
+        batch = replay.sample()
+        ql.train_on_batch(batch)
 
         if t % target_update_frec == 0:
-            print("Evaluating Agent ...")
-            ql.play()
+            print("Updating Target Weights ...")
             ql.update_target_weights()
 
-        if t % 1000 == 0:
-            print("Played {} steps ...".format(t))
+        if t % save_model_freq == 0:
+            print("{} steps in ...".format(t))
+            print("Models saved in file: {} ...".format(save_path))
+            saver.save(sess, save_path)
 
     sess.close()
     # env.monitor.close()

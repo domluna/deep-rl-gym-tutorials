@@ -11,7 +11,6 @@ class Env(object):
     def reset(self):
         obs = self.env.reset()
         if self.op: obs = self.op(obs)
-        print(obs.shape)
 
     def step(self, action):
         obs, reward, terminal, info = self.env.step(action)

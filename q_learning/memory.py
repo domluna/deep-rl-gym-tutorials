@@ -6,15 +6,15 @@ import numpy as np
 
 class SimpleExperienceReplay(object):
 
-    def __init__(self, capacity, batch_size, history_window, height, width):
+    def __init__(self, capacity, batch_size, history_window, observation_shape):
         self.capacity = capacity
         self.batch_size = batch_size
         self.history_window = history_window
         self.index = 0
         self.size = 0
 
-        obs_memory_shape = (capacity, height, width)
-        obs_buffer_shape = (batch_size, history_window, height, width)
+        obs_memory_shape = [capacity] + list(observation_shape)
+        obs_buffer_shape = [batch_size, history_window] + list(observation_shape)
 
         # memory
         self.obs = np.zeros(obs_memory_shape, dtype=np.float32)
@@ -40,10 +40,6 @@ class SimpleExperienceReplay(object):
 
         self.index = (self.index + 1) % self.capacity
         self.size = min(self.capacity, self.size + 1)
-
-    # def last_history(self, current_obs):
-    #     prev = self.obs[i-self.history_window-1:i, ...]
-    #     return np.
 
     def sample(self):
         l = 0
@@ -80,4 +76,23 @@ class SimpleExperienceReplay(object):
         self.b_actions[...] = 0
         self.b_rewards[...] = 0
         self.b_terminals[...] = 0
+
+
+class Buffer(object):
+    def __init__(self, history_window, observation_shape):
+        self.size = history_window
+        self.observations = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
+
+    def add(self, observation):
+        """Shifts the observations to make room for the most recent one. 
+        The most recent observation should be on the last index
+        """
+        self.observations[0, :self.size-1, ...] = self.observations[0, 1:self.size, ...]
+        self.observations[0, self.size-1, ...] = observation
+
+    def reset(self):
+        self.observations[...] = 0
+
+
+
 
