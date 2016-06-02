@@ -17,9 +17,9 @@ def atari_cnn(input_shape, n_actions):
     """
 
     input = Input(shape=input_shape)
-    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu', dim_ordering='tf')(input)
-    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu', dim_ordering='tf')(x)
-    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu', dim_ordering='tf')(x)
+    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu')(input)
+    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu')(x)
+    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu')(x)
     x = Flatten()(x)
 
     hidden = Dense(512, activation='relu')(x)
