@@ -117,7 +117,7 @@ with tf.Graph().as_default():
 
     obs_preprocess = rgb2y_resize(observation_shape, height, width, sess)
     reward_clip = lambda x: np.clip(x, -1.0, 1.0)
-    epsilon_decay = lambda t: max(0.1, 1.0 - (t/total_steps+1))
+    epsilon_decay = lambda t: max(0.1, 1.0 - (t/(total_steps+1)))
     env = Env(gym_env, obs_preprocess, reward_clip)
 
     main = atari_cnn(network_input_shape, n_actions)
@@ -147,6 +147,7 @@ with tf.Graph().as_default():
         epsilon = epsilon_decay(t)
         print(epsilon)
 
+        # TODO: make obs (history_window, width, height)
         action = ql.predict_action(obs, epsilon)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
