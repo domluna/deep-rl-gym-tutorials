@@ -43,15 +43,17 @@ class SimpleExperienceReplay(object):
 
     def sample(self):
         l = 0
+        tries = 0
 
         while l < self.batch_size:
             i = np.random.randint(self.history_window, self.size - self.history_window)
+            tries += 1
 
             # only sample from past observations
             if i - self.history_window >= self.index and self.index <= i:
                 continue
 
-            # avoid frames from different episodes
+            # avoid sampling from disconnected episodes
             if self.terminals[i-self.history_window:i].any():
                 continue
 
@@ -62,6 +64,9 @@ class SimpleExperienceReplay(object):
             self.b_terminals[l] = self.terminals[i]
 
             l += 1
+
+        if tries > 100:
+            print("randints called", tries, "times")
 
 
         return (self.b_obs, self.b_actions, self.b_rewards, self.b_next_obs, self.b_terminals)

@@ -20,13 +20,15 @@ import numpy as np
 import tensorflow as tf
 import argparse
 import random
+import time
+import os
 
 seed = 0
-total_steps = 1000000
+max_steps = 100000
 replay_capacity = 100000
-replay_start = 10000
+replay_start = 1000
 target_update_frec = 10000
-save_model_freq = 50000
+save_model_freq = 10000
 history_window = 4
 height = 84
 width = 84
@@ -89,15 +91,29 @@ def random_start(env, replay, n):
         else:
             obs = next_obs
 
+def load_checkpoint(saver, dir, sess):
+    ckpt = tf.train.get_checkpoint_state(dir)
+    if ckpt and ckpt.model_checkpoint_path:
+        saver.restore(sess, ckpt.model_checkpoint_path)
+        print("Restored from checkpoint {}".format(ckpt.model_checkpoint_path))
+    else:
+        print("No checkpoint")
 
-gym_env = gym.make('Breakout-v0')
+def save_checkpoint(saver, dir, sess, step=None):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    save_path = saver.save(sess, checkpoint_dir + '/model', step)
+    print("Models saved in file: {} ...".format(save_path))
+
+
+env_name = 'Breakout-v0'
+gym_env = gym.make(env_name)
+outdir = '/tmp/DDQN-monitor' + '-' + env_name
+gym_env.monitor.start(outdir, force=True)
 n_actions = gym_env.action_space.n
 observation_shape = gym_env.observation_space.shape
-# outdir = '/tmp/DDQN-Atari'
-# gym_env.monitor.start(outdir, force=True)
-save_path = '/tmp/atari.ckpt'
+checkpoint_dir = '/tmp/DDQN-ckpt' + '-' +  env_name
 
-# seed all the things! DJ Khaled says this is a "major key"
 np.random.seed(seed)
 random.seed(seed)
 tf.set_random_seed(seed)
@@ -107,12 +123,20 @@ with tf.Graph().as_default():
     sess = tf.Session()
     K.set_session(sess)
 
-    epsilon_decay = lambda t: max(0.1, 1.0 - (t/(total_steps+1)))
+    t = tf.Variable(0, trainable=False, name='step')
+    epsilon = tf.Variable(1.0, trainable=False, name='epsilon')
+    epsilon_decay = tf.assign(epsilon, tf.maximum(0.1, 1.0 - tf.cast(t / max_steps, tf.float32)))
+    incr_t = tf.assign_add(t, 1)
+
     main = atari_cnn(network_input_shape, n_actions)
     target = atari_cnn(network_input_shape, n_actions)
     adam = Adam(lr=learning_rate)
     main.compile(optimizer=adam, loss=clipped_mse)
+
+    sess.run(tf.initialize_variables([t, epsilon]))
+
     saver = tf.train.Saver()
+    load_checkpoint(saver, checkpoint_dir, sess)
 
     replay = SimpleExperienceReplay(replay_capacity, batch_size, history_window, (height, width))
     buffer = Buffer(history_window, (height, width))
@@ -135,22 +159,28 @@ with tf.Graph().as_default():
 
     # resets env and does NOOP (0) actions
     obs = noop_start(env, replay, buffer)
-    for t in range(1, total_steps+1):
+    t0 = time.time()
+    t_val = sess.run(t)
+    while t_val < max_steps:
         if terminal:
+            taken = time.time() - t0
             print("************************")
-            print("Episode: {}".format(episode_n))
-            print("Episode total reward = {}".format(episode_reward))
-            print("Number of actions taken during episode = {}".format(episode_len))
+            print("Episode {}".format(episode_n))
+            print("total reward = {}".format(episode_reward))
+            print("Number of actions = {}".format(episode_len))
+            print("Time taken = {:.2f} seconds".format(taken))
+            t0 = time.time()
 
             episode_n += 1
             episode_reward = 0
             episode_len = 0
             obs = noop_start(env, replay, buffer)
 
-        epsilon = epsilon_decay(t)
+        sess.run(epsilon_decay)
+        eps_val = sess.run(epsilon)
 
         buffer.add(obs)
-        action = ql.predict_action(buffer.observations, epsilon)
+        action = ql.predict_action(buffer.observations, eps_val)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
         episode_reward += reward
@@ -160,17 +190,20 @@ with tf.Graph().as_default():
         batch = replay.sample()
         ql.train_on_batch(batch)
 
-        if t % target_update_frec == 0:
-            print("Updating Target Weights ...")
-            ql.update_target_weights()
+        sess.run(incr_t)
+        t_val = sess.run(t)
 
-        if t % save_model_freq == 0:
-            print("{} steps in ...".format(t))
-            print("Models saved in file: {} ...".format(save_path))
-            saver.save(sess, save_path)
+        if t_val % target_update_frec == 0:
+            ql.update_target_weights()
+            print("Updated Target Weights ...")
+
+        if t_val % save_model_freq == 0:
+            save_checkpoint(saver, checkpoint_dir, sess, t)
+            print("Epsilon status =  {:.3f}".format(eps_val))
+
 
     sess.close()
-    # env.monitor.close()
+    env.monitor.close()
 
 
 
