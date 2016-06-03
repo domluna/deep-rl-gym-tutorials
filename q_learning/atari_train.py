@@ -81,7 +81,7 @@ parser.add_argument('--exploration_steps', type=int, default=500000, help='Numbe
 parser.add_argument('--epsilon_start', type=float, default=1.0, help='Epsilon decay start value')
 parser.add_argument('--epsilon_end', type=float, default=0.1, help='Epsilon decay end value')
 
-parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for Adam Optimizer')
+parser.add_argument('--learning_rate', type=float, default=0.00025, help='Learning rate for Adam Optimizer')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
 parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learning steps')
 parser.add_argument('--target_update_freq', type=int, default=10000, help='Frequency to update target network weights')
