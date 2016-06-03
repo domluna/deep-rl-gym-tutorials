@@ -43,15 +43,9 @@ class SimpleExperienceReplay(object):
 
     def sample(self):
         l = 0
-        tries = 0
 
         while l < self.batch_size:
             i = np.random.randint(self.history_window, self.size - self.history_window)
-            tries += 1
-
-            # only sample from past observations
-            if i - self.history_window >= self.index and self.index <= i:
-                continue
 
             # avoid sampling from disconnected episodes
             if self.terminals[i-self.history_window:i].any():
@@ -64,10 +58,6 @@ class SimpleExperienceReplay(object):
             self.b_terminals[l] = self.terminals[i]
 
             l += 1
-
-        if tries > 100:
-            print("randints called", tries, "times")
-
 
         return (self.b_obs, self.b_actions, self.b_rewards, self.b_next_obs, self.b_terminals)
 
@@ -86,17 +76,16 @@ class SimpleExperienceReplay(object):
 class Buffer(object):
     def __init__(self, history_window, observation_shape):
         self.size = history_window
-        self.observations = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
+        self.state = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
 
     def add(self, observation):
         """Shifts the observations to make room for the most recent one. 
-        The most recent observation should be on the last index
-        """
-        self.observations[0, :self.size-1, ...] = self.observations[0, 1:self.size, ...]
-        self.observations[0, self.size-1, ...] = observation
+        The most recent observation should be on the last index"""
+        self.state[0, :self.size-1, ...] = self.state[0, 1:self.size, ...]
+        self.state[0, self.size-1, ...] = observation
 
     def reset(self):
-        self.observations[...] = 0
+        self.state[...] = 0
 
 
 
