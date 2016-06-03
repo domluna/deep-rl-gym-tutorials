@@ -12,7 +12,7 @@ from skimage.transform import resize
 
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
-from models import atari_cnn
+from models import duel_atari_cnn as nn
 from environments import Env
 
 import gym
@@ -153,8 +153,8 @@ with tf.Graph().as_default():
                 args.epsilon_start - tf.cast(t / args.exploration_steps, tf.float32)))
     incr_t = tf.assign_add(t, 1)
 
-    main = atari_cnn(network_input_shape, n_actions)
-    target = atari_cnn(network_input_shape, n_actions)
+    main = nn(network_input_shape, n_actions)
+    target = nn(network_input_shape, n_actions)
     adam = Adam(lr=args.learning_rate)
     main.compile(optimizer=adam, loss=clipped_mse)
 

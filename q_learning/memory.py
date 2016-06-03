@@ -76,16 +76,20 @@ class SimpleExperienceReplay(object):
 class Buffer(object):
     def __init__(self, history_window, observation_shape):
         self.size = history_window
-        self.state = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
+        self._state = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
 
     def add(self, observation):
         """Shifts the observations to make room for the most recent one. 
         The most recent observation should be on the last index"""
-        self.state[0, :self.size-1, ...] = self.state[0, 1:self.size, ...]
-        self.state[0, self.size-1, ...] = observation
+        self._state[0, :self.size-1, ...] = self._state[0, 1:self.size, ...]
+        self._state[0, self.size-1, ...] = observation
 
     def reset(self):
-        self.state[...] = 0
+        self._state[...] = 0
+
+    @property
+    def state(self):
+        return self._state
 
 
 
