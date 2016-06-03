@@ -104,6 +104,9 @@ parser.add_argument('--seed', type=int, default=0, help='Random seed')
 args = parser.parse_args()
 print(args)
 
+if not args.name:
+    parser.error("--name must be not be empty")
+
 gym_env = gym.make(args.name)
 if args.monitor_dir:
     if args.resume:
@@ -123,7 +126,6 @@ observation_shape = gym_env.observation_space.shape
 with tf.Graph().as_default():
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    # config.log_device_placement = True
     sess = tf.Session(config=config)
     K.set_session(sess)
 

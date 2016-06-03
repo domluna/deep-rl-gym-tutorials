@@ -77,10 +77,10 @@ args = parser.parse_args()
 print(args)
 
 if not args.checkpoint_dir:
-    raise ValueError('Argument --checkpoint_dir must not be empty')
+    parser.error('--checkpoint_dir must not be empty')
 
 if not args.name:
-    raise ValueError('Argument --name must not be empty')
+    parser.error('--name must not be empty')
 
 gym_env = gym.make(args.name)
 
