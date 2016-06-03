@@ -1,19 +1,13 @@
 from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import division
 
-from keras.layers import Convolution2D, Flatten, Input, Dense
+from keras.layers import Convolution2D, Flatten, Input, Dense, Lambda
 from keras.models import Model
+from keras import backend as K
 
 def atari_cnn(input_shape, n_actions):
     """
-    input_shape: 3D Tensor (height, width, channels), TF format
-
-    Where history_len is the number of stacked images (think video clip)
-
+    input_shape: 3D Tensor (channels, height, width) format
     n_actions: int
-
-    The number of possible actions in our environment.
     """
 
     input = Input(shape=input_shape)
@@ -26,3 +20,34 @@ def atari_cnn(input_shape, n_actions):
     output = Dense(n_actions, activation='relu')(hidden)
 
     return Model(input, output)
+
+def duel_atari_cnn(input_shape, n_actions, mode='mean'):
+    """
+    input_shape: 3D Tensor (channels, height, width) format
+    n_actions: int
+    """
+
+    agg = None
+    if mode == 'mean':
+        agg = Lambda(lambda a: K.expand_dims(a[:,0], dim=-1) + a[:,1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(n_actions,))
+    elif mode == 'max':
+	agg = Lambda(lambda a: K.expand_dims(a[:,0], dim=-1) + a[:,1:] - K.max(a[:, 1:], keepdims=True), output_shape=(n_actions,))
+    else:
+        raise ValueError("mode must be either 'mean' or 'max'")
+
+    input = Input(shape=input_shape)
+    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu')(input)
+    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu')(x)
+    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu')(x)
+    x = Flatten()(x)
+
+    x = Dense(512, activation='relu')(x)
+    x = Dense(n_actions+1)(x)
+    output = agg(x)
+
+    return Model(input, output)
+
+
+
+
+
