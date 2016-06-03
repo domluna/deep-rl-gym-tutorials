@@ -6,6 +6,8 @@ from keras import backend as K
 
 def atari_cnn(input_shape, n_actions):
     """
+    Follows the network architecture described in the 2015 Deepmind Nature paper.
+
     input_shape: 3D Tensor (channels, height, width) format
     n_actions: int
     """
@@ -17,12 +19,15 @@ def atari_cnn(input_shape, n_actions):
     x = Flatten()(x)
 
     hidden = Dense(512, activation='relu')(x)
-    output = Dense(n_actions, activation='relu')(hidden)
+    output = Dense(n_actions)(hidden)
 
     return Model(input, output)
 
 def duel_atari_cnn(input_shape, n_actions, mode='mean'):
     """
+    Follows the network architecture described in the 2015 Deepmind Nature paper
+    with the changes proposed in Dueling Network paper.
+
     input_shape: 3D Tensor (channels, height, width) format
     n_actions: int
     """
