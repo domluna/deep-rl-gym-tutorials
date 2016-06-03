@@ -31,24 +31,6 @@ def clipped_mse(y_true, y_pred):
     err = K.mean(K.square(y_pred - y_true), axis=-1)
     return K.clip(err, -1.0, 1.0)
 
-def play(ql, env, buffer, epsilon=0.05, render=True):
-    terminal = False
-    episode_reward = 0
-    t = 0
-    buffer.reset()
-    obs = env.reset()
-    buffer.add(obs)
-
-    while not terminal:
-        if render: env.render()
-        action = ql.predict_action(buffer.observations, epsilon)
-        obs, reward, terminal, _ = env.step(action)
-        buffer.add(obs)
-        episode_reward += reward
-        t += 1
-
-    print("Episode Reward {}".format(episode_reward))
-
 def noop_start(env, replay, buffer, max_actions=30):
     """
     SHOULD BE RUN AT THE START OF AN EPISODE
