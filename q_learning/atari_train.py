@@ -77,7 +77,7 @@ def save_checkpoint(saver, dir, sess, step=None):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--total_steps', type=int, default=2000000, help='Number of total training steps')
-parser.add_argument('--exploration_steps', type=int, default=500000, help='Number of exploration steps (with epsilon decay')
+parser.add_argument('--exploration_steps', type=int, default=1000000, help='Number of exploration steps (with epsilon decay')
 parser.add_argument('--epsilon_start', type=float, default=1.0, help='Epsilon decay start value')
 parser.add_argument('--epsilon_end', type=float, default=0.1, help='Epsilon decay end value')
 
@@ -93,7 +93,7 @@ parser.add_argument('--height', type=int, default=80, help='Observation height a
 parser.add_argument('--width', type=int, default=80, help='Observation width after resize')
 parser.add_argument('--history_window', type=int, default=4, help='Number of observations forming a state')
 
-parser.add_argument('--save_model_freq', type=int, default=100000, help='Frequency to save TF Graph')
+parser.add_argument('--save_model_freq', type=int, default=250000, help='Frequency to save TF Graph')
 parser.add_argument('--checkpoint_dir', type=str, help='Directory TF Graph will be saved to periodically')
 parser.add_argument('--monitor_dir', type=str, help='Directory OpenAI Gym will monitor and write results to')
 parser.add_argument('--resume', action='store_true', help='Load saved model from checkpoint_dir and continue monitoring from monitor_dir')

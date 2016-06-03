@@ -31,7 +31,7 @@ def clipped_mse(y_true, y_pred):
     err = K.mean(K.square(y_pred - y_true), axis=-1)
     return K.clip(err, -1.0, 1.0)
 
-def play(ql, env, buffer, epsilon=0.05):
+def play(ql, env, buffer, epsilon=0.0):
     terminal = False
     episode_reward = 0
     t = 0
@@ -59,7 +59,7 @@ def load_checkpoint(saver, dir, sess):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--games', type=int, default=10, help='Number of games played')
-parser.add_argument('--epsilon', type=float, default=0.05, help='Epsilon value')
+parser.add_argument('--epsilon', type=float, default=0, help='Epsilon value')
 parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for Adam Optimizer')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
 parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learning steps')
