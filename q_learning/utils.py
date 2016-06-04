@@ -1,5 +1,14 @@
 import os
 import tensorflow as tf
+import numpy as np
+
+from six.moves import range
+from skimage.color import rgb2gray
+from skimage.transform import resize
+from skimage import img_as_ubyte
+
+def preprocess(observation, new_height, new_width):
+    return img_as_ubyte(resize(rgb2gray(observation), (new_height, new_width)))
 
 def load_checkpoint(saver, dir, sess):
     ckpt = tf.train.get_checkpoint_state(dir)
@@ -14,3 +23,31 @@ def save_checkpoint(saver, dir, sess, step=None):
         os.makedirs(dir)
     save_path = saver.save(sess, dir + '/graph', step)
     print("Models saved in file: {} ...".format(save_path))
+
+def noop_start(env, replay, buf, max_actions=30):
+    """
+    SHOULD BE RUN AT THE START OF AN EPISODE
+    """
+    obs = env.reset()
+    for _ in range(np.random.randint(replay.history_window, max_actions)):
+        next_obs, reward, terminal, _ = env.step(0)
+        replay.add((obs, 0, reward, terminal))
+        buf.add(obs)
+        obs = next_obs
+    return obs
+
+def random_start(env, replay, n):
+    """Add `n` random actions to the Replay Experience.
+
+    If a terminal state is reached, the environmment will reset
+    and sampling with continue.
+    """
+    obs = env.reset()
+    for _ in range(n):
+        action = env.action_space.sample()
+        next_obs, reward, terminal, _ = env.step(action)
+        replay.add((obs, action, reward, terminal))
+        if terminal:
+            obs = env.reset()
+        else:
+            obs = next_obs

@@ -7,14 +7,12 @@ from __future__ import division
 from six.moves import range
 from keras import backend as K
 from keras.optimizers import Adam
-from skimage.color import rgb2gray
-from skimage.transform import resize
 
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
 from models import duel_atari_cnn as nn
-from environments import Env
-from utils import load_checkpoint, save_checkpoint
+from envs import Env
+from utils import *
 
 import gym
 import numpy as np
@@ -24,41 +22,10 @@ import random
 import time
 import os
 
-def preprocess(observation, new_height, new_width):
-    return resize(rgb2gray(observation), (new_height, new_width))
-
 def clipped_mse(y_true, y_pred):
     """MSE clipped into [1.0, 1.0] range"""
     err = K.mean(K.square(y_pred - y_true), axis=-1)
     return K.clip(err, -1.0, 1.0)
-
-def noop_start(env, replay, buffer, max_actions=30):
-    """
-    SHOULD BE RUN AT THE START OF AN EPISODE
-    """
-    obs = env.reset()
-    for _ in range(np.random.randint(replay.history_window, max_actions)):
-        next_obs, reward, terminal, _ = env.step(0)
-        replay.add((obs, 0, reward, terminal))
-        buffer.add(obs)
-        obs = next_obs
-    return obs
-
-def random_start(env, replay, n):
-    """Add `n` random actions to the Replay Experience.
-
-    If a terminal state is reached, the environmment will reset
-    and sampling with continue.
-    """
-    obs = env.reset()
-    for _ in range(n):
-        action = env.action_space.sample()
-        next_obs, reward, terminal, _ = env.step(action)
-        replay.add((obs, action, reward, terminal))
-        if terminal: 
-            obs = env.reset()
-        else:
-            obs = next_obs
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--total_steps', type=int, default=5000000, help='Number of total training steps')
@@ -72,8 +39,8 @@ parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learn
 parser.add_argument('--target_update_freq', type=int, default=10000, help='Frequency to update target network weights')
 parser.add_argument('--train_batch_freq', type=int, default=4, help='Frequency to train a batch of states (steps)')
 
-parser.add_argument('--replay_capacity', type=int, default=100000, help='Maximum capacity of the experience replay')
-parser.add_argument('--replay_start', type=int, default=5000, help='Number of random action observations to intially fill experience replay')
+parser.add_argument('--replay_capacity', type=int, default=1000000, help='Maximum capacity of the experience replay')
+parser.add_argument('--replay_start', type=int, default=50000, help='Number of random action observations to intially fill experience replay')
 parser.add_argument('--height', type=int, default=80, help='Observation height after resize')
 parser.add_argument('--width', type=int, default=80, help='Observation width after resize')
 parser.add_argument('--history_window', type=int, default=4, help='Number of observations forming a state')
@@ -134,7 +101,7 @@ with tf.Graph().as_default():
         load_checkpoint(saver, args.checkpoint_dir, sess)
 
     replay = SimpleExperienceReplay(args.replay_capacity, args.batch_size, args.history_window, (args.height, args.width))
-    buffer = Buffer(args.history_window, (args.height, args.width))
+    buf = Buffer(args.history_window, (args.height, args.width))
     obs_preprocess = lambda i: preprocess(i, args.height, args.width)
     reward_clip = lambda r: np.clip(r, -1.0, 1.0)
     env = Env(gym_env, obs_preprocess, reward_clip)
@@ -153,7 +120,7 @@ with tf.Graph().as_default():
     episode_len = 0
 
     # resets env and does NOOP (0) actions
-    obs = noop_start(env, replay, buffer)
+    obs = noop_start(env, replay, buf)
     t0 = time.time()
     t_val = sess.run(t)
     while t_val < args.total_steps:
@@ -169,13 +136,13 @@ with tf.Graph().as_default():
             episode_reward = 0
             episode_len = 0
             t0 = time.time()
-            obs = noop_start(env, replay, buffer)
+            obs = noop_start(env, replay, buf)
 
         sess.run(epsilon_decay)
         eps_val = sess.run(epsilon)
 
-        buffer.add(obs)
-        action = ql.predict_action(buffer.state, eps_val)
+        buf.add(obs)
+        action = ql.predict_action(buf.state, eps_val)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
         episode_reward += reward
@@ -197,7 +164,4 @@ with tf.Graph().as_default():
             save_checkpoint(saver, args.checkpoint_dir, sess, t)
             print("Epsilon status =  {:.3f}".format(eps_val))
 
-
     sess.close()
-
-

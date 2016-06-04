@@ -17,14 +17,14 @@ class SimpleExperienceReplay(object):
         obs_buffer_shape = [batch_size, history_window] + list(observation_shape)
 
         # memory
-        self.obs = np.zeros(obs_memory_shape, dtype=np.float32)
+        self.obs = np.zeros(obs_memory_shape, dtype=np.uint8)
         self.actions = np.zeros(capacity, dtype=np.uint8)
         self.rewards = np.zeros(capacity, dtype=np.float32)
         self.terminals = np.zeros(capacity, dtype=np.bool)
 
         # buffer
-        self.b_obs = np.zeros(obs_buffer_shape, dtype=np.float32)
-        self.b_next_obs = np.zeros(obs_buffer_shape, dtype=np.float32)
+        self.b_obs = np.zeros(obs_buffer_shape, dtype=np.uint8)
+        self.b_next_obs = np.zeros(obs_buffer_shape, dtype=np.uint8)
         self.b_actions = np.zeros(batch_size, dtype=np.uint8)
         self.b_rewards = np.zeros(batch_size, dtype=np.float32)
         self.b_terminals = np.zeros(batch_size, dtype=np.bool)
@@ -76,7 +76,7 @@ class SimpleExperienceReplay(object):
 class Buffer(object):
     def __init__(self, history_window, observation_shape):
         self.size = history_window
-        self._state = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
+        self._state = np.zeros([1, history_window] + list(observation_shape), dtype=np.uint8)
 
     def add(self, observation):
         """Shifts the observations to make room for the most recent one. 

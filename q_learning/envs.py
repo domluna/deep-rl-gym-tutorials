@@ -3,10 +3,13 @@ from __future__ import print_function
 from __future__ import division
 
 class Env(object):
-    def __init__(self, env, observation_preprocess=None, reward_clip=None):
+    """Minimal wrapper around OpenAI Gym Env to allow
+    for preprocessing observation and reward clipping
+    during steps."""
+    def __init__(self, env, observation_preprocess=None, reward_clipperper=None):
         self.env = env
         self.op = observation_preprocess
-        self.clip = reward_clip
+        self.clip = reward_clipper
 
     def reset(self):
         obs = self.env.reset()
