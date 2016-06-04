@@ -1,6 +1,6 @@
-import os
 import tensorflow as tf
 import numpy as np
+import os
 
 from six.moves import range
 from skimage.color import rgb2gray

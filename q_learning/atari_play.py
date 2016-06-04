@@ -1,5 +1,3 @@
-""" Double Deep Q-Learning on Gym Atari Environments
-"""
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import division
@@ -19,8 +17,6 @@ import numpy as np
 import tensorflow as tf
 import argparse
 import random
-import time
-import os
 
 def clipped_mse(y_true, y_pred):
     """MSE clipped into [1.0, 1.0] range"""
