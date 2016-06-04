@@ -7,13 +7,12 @@ from __future__ import division
 from six.moves import range
 from keras import backend as K
 from keras.optimizers import Adam
-from skimage.color import rgb2gray
-from skimage.transform import resize
 
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
 from models import duel_atari_cnn as nn
 from environments import Env
+from utils import *
 
 import gym
 import numpy as np
@@ -23,43 +22,33 @@ import random
 import time
 import os
 
-def preprocess(observation, new_height, new_width):
-    return resize(rgb2gray(observation), (new_height, new_width))
-
 def clipped_mse(y_true, y_pred):
     """MSE clipped into [1.0, 1.0] range"""
     err = K.mean(K.square(y_pred - y_true), axis=-1)
     return K.clip(err, -1.0, 1.0)
 
-def play(ql, env, buffer, epsilon=0.0):
+def play(ql, env, buf, epsilon=0.0):
     terminal = False
     episode_reward = 0
     t = 0
-    buffer.reset()
+    buf.reset()
     obs = env.reset()
-    buffer.add(obs)
+    buf.add(obs)
 
     while not terminal:
         env.render()
-        action = ql.predict_action(buffer.state, epsilon)
+        action = ql.predict_action(buf.state, epsilon)
         obs, reward, terminal, _ = env.step(action)
-        buffer.add(obs)
-        episode_reward += reward
+        buf.add(obs)
+        if reward != 0:
+            episode_reward += reward
         t += 1
 
     print("Episode Reward {}".format(episode_reward))
 
-def load_checkpoint(saver, dir, sess):
-    ckpt = tf.train.get_checkpoint_state(dir)
-    if ckpt and ckpt.model_checkpoint_path:
-        saver.restore(sess, ckpt.model_checkpoint_path)
-        print("Restored from checkpoint {}".format(ckpt.model_checkpoint_path))
-    else:
-        print("No checkpoint")
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--games', type=int, default=10, help='Number of games played')
-parser.add_argument('--epsilon', type=float, default=0, help='Epsilon value')
+parser.add_argument('--epsilon', type=float, default=0, help='Epsilon value, probability of a random action')
 parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for Adam Optimizer')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
 parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learning steps')
@@ -107,7 +96,7 @@ with tf.Graph().as_default():
     saver = tf.train.Saver()
     load_checkpoint(saver, args.checkpoint_dir, sess)
 
-    buffer = Buffer(args.history_window, (args.height, args.width))
+    buf = Buffer(args.history_window, (args.height, args.width))
     obs_preprocess = lambda i: preprocess(i, args.height, args.width)
     reward_clip = lambda r: np.clip(r, -1.0, 1.0)
     env = Env(gym_env, obs_preprocess, reward_clip)
@@ -116,8 +105,4 @@ with tf.Graph().as_default():
 
     print("Playing {} games ...".format(args.games))
     for _ in range(args.games):
-        play(ql, env, buffer, epsilon=args.epsilon)
-
-
-
-
+        play(ql, env, buf, epsilon=args.epsilon)
