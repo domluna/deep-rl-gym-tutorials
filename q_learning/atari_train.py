@@ -59,11 +59,6 @@ if not args.name:
     parser.error("--name must be not be empty")
 
 gym_env = gym.make(args.name)
-if args.monitor_dir:
-    if args.resume:
-        gym_env.monitor.start(args.monitor_dir, resume=True)
-    else:
-        gym_env.monitor.start(args.monitor_dir, force=True)
 
 np.random.seed(args.seed)
 random.seed(args.seed)
@@ -93,23 +88,35 @@ with tf.Graph().as_default():
     adam = Adam(lr=args.learning_rate)
     main.compile(optimizer=adam, loss=clipped_mse)
 
+    # compile initializes the network vars
     sess.run(tf.initialize_variables([t, epsilon]))
 
-    saver = tf.train.Saver()
+    # TODO: Figure out why after a lot of steps the meta
+    # file becomes so large, for now set max_to_keep=1.
+    saver = tf.train.Saver(max_to_keep=1)
     if args.resume and args.checkpoint_dir:
         load_checkpoint(saver, args.checkpoint_dir, sess)
 
     replay = SimpleExperienceReplay(args.replay_capacity, args.batch_size, args.history_window, (args.height, args.width))
     buf = Buffer(args.history_window, (args.height, args.width))
-    obs_preprocess = lambda i: preprocess(i, args.height, args.width)
-    reward_clip = lambda r: np.clip(r, -1.0, 1.0)
-    env = Env(gym_env, obs_preprocess, reward_clip)
+    obs_preprocess = lambda o: preprocess(o, args.height, args.width)
+    reward_clipper = lambda r: np.clip(r, -1.0, 1.0)
 
-    # and initialize replay with some random experiences
+    # wrap Gym Env so we can easily process observations
+    # and rewards
+    env = Env(gym_env, obs_preprocess, reward_clipper)
+
+    # Initialize replay with some random experiences
     print("Initializing replay with {} experiences".format(args.replay_start))
     random_start(env, replay, args.replay_start)
 
-    print("Starting DDQN agent training")
+    print("Training DDQN Agent")
+    if args.monitor_dir:
+        if args.resume:
+            env.monitor.start(args.monitor_dir, resume=True)
+        else:
+            env.monitor.start(args.monitor_dir, force=True)
+
     ql = DDQN(main, target, args.batch_size, n_actions, args.gamma)
     ql.update_target_weights()
 
@@ -118,7 +125,7 @@ with tf.Graph().as_default():
     episode_n = 1
     episode_len = 0
 
-    # resets env and does NOOP (0) actions
+    # Resets env and does NOOP (0) actions
     obs = noop_start(env, replay, buf)
     t0 = time.time()
     t_val = sess.run(t)
@@ -144,7 +151,8 @@ with tf.Graph().as_default():
         action = ql.predict_action(buf.state, eps_val)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
-        episode_reward += reward
+        if reward != 0:
+            episode_reward += reward
         episode_len += 1
         obs = obs_next
 

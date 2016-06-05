@@ -30,14 +30,14 @@ def noop_start(env, replay, buf, max_actions=30):
     """
     obs = env.reset()
     for _ in range(np.random.randint(replay.history_window, max_actions)):
-        next_obs, reward, terminal, _ = env.step(0)
+        next_obs, reward, terminal, _ = env.step(0) # 0 is a noop action in Atari envs
         replay.add((obs, 0, reward, terminal))
         buf.add(obs)
         obs = next_obs
     return obs
 
 def random_start(env, replay, n):
-    """Add `n` random actions to the Replay Experience.
+    """Sample and add `n` random actions to the Experience Replay.
 
     If a terminal state is reached, the environmment will reset
     and sampling with continue.
