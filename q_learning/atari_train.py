@@ -6,13 +6,14 @@ from __future__ import division
 
 from six.moves import range
 from keras import backend as K
-from keras.optimizers import Adam
+from keras.optimizers import RMSprop
 
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
 from models import duel_atari_cnn as nn
 from envs import Env
 from utils import *
+from collections import Counter
 
 import gym
 import numpy as np
@@ -21,24 +22,20 @@ import argparse
 import random
 import time
 
-def clipped_mse(y_true, y_pred):
-    """MSE clipped into [1.0, 1.0] range"""
-    err = K.mean(K.square(y_pred - y_true), axis=-1)
-    return K.clip(err, -1.0, 1.0)
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--total_steps', type=int, default=5000000, help='Number of total training steps')
 parser.add_argument('--exploration_steps', type=int, default=1000000, help='Number of exploration steps with epsilon=1.0')
 parser.add_argument('--epsilon', type=float, default=0.1, help='Fixed epsilon value after exploration phase')
 
-parser.add_argument('--learning_rate', type=float, default=0.00025, help='Learning rate for Adam Optimizer')
+parser.add_argument('--learning_rate', type=float, default=0.00025, help='Learning rate for RMSprop')
+parser.add_argument('--decay_rate', type=float, default=0.95, help='Decay rate for RMSprop')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
 parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learning steps')
 parser.add_argument('--target_update_freq', type=int, default=10000, help='Frequency to update target network weights')
 parser.add_argument('--train_batch_freq', type=int, default=4, help='Frequency to train a batch of states (steps)')
 
 parser.add_argument('--replay_capacity', type=int, default=1000000, help='Maximum capacity of the experience replay')
-parser.add_argument('--replay_start', type=int, default=50000, help='Number of random action observations to intially fill experience replay')
+parser.add_argument('--random_start', type=int, default=50000, help='Number of random action observations to intially fill experience replay')
 parser.add_argument('--height', type=int, default=80, help='Observation height after resize')
 parser.add_argument('--width', type=int, default=80, help='Observation width after resize')
 parser.add_argument('--history_window', type=int, default=4, help='Number of observations forming a state')
@@ -80,8 +77,8 @@ with tf.Graph().as_default():
 
     main = nn(network_input_shape, n_actions)
     target = nn(network_input_shape, n_actions)
-    adam = Adam(lr=args.learning_rate, epsilon=0.1)
-    main.compile(optimizer=adam, loss=clipped_mse)
+    opt = RMSprop(lr=args.learning_rate, rho=args.decay_rate)
+    main.compile(optimizer=opt, loss='mse')
 
     # compile initializes the network vars
     sess.run(tf.initialize_variables([t]))
@@ -102,8 +99,8 @@ with tf.Graph().as_default():
     env = Env(gym_env, obs_preprocess, reward_clipper)
 
     # Initialize replay with some random experiences
-    print("Initializing replay with {} experiences".format(args.replay_start))
-    random_start(env, replay, args.replay_start)
+    print("Initializing replay with {} experiences".format(args.random_start))
+    random_start(env, replay, args.random_start)
 
     print("Training DDQN Agent")
     if args.monitor_dir:
@@ -118,7 +115,7 @@ with tf.Graph().as_default():
     terminal = False
     episode_reward = 0
     episode_n = 1
-    episode_len = 0
+    actions_count = Counter()
 
     # Resets env and does NOOP (0) actions
     obs = noop_start(env, replay, buf)
@@ -130,12 +127,13 @@ with tf.Graph().as_default():
             print("************************")
             print("Episode {}".format(episode_n))
             print("Total reward = {}".format(episode_reward))
-            print("Number of actions = {}".format(episode_len))
+            print("Number of actions = {}".format(sum(actions_count.values())))
+            print("Actions count = {}".format(actions_count))
             print("Time taken = {:.2f} seconds".format(taken))
 
             episode_n += 1
             episode_reward = 0
-            episode_len = 0
+            actions_count.clear()
             t0 = time.time()
             obs = noop_start(env, replay, buf)
 
@@ -146,9 +144,10 @@ with tf.Graph().as_default():
         action = ql.predict_action(buf.state, epsilon)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
+
         if reward != 0:
             episode_reward += reward
-        episode_len += 1
+        actions_count[action] += 1
         obs = obs_next
 
         if t_val % args.train_batch_freq == 0:

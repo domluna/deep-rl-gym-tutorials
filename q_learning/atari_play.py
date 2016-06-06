@@ -4,7 +4,6 @@ from __future__ import division
 
 from six.moves import range
 from keras import backend as K
-from keras.optimizers import Adam
 
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
@@ -18,11 +17,6 @@ import numpy as np
 import tensorflow as tf
 import argparse
 import random
-
-def clipped_mse(y_true, y_pred):
-    """MSE clipped into [1.0, 1.0] range"""
-    err = K.mean(K.square(y_pred - y_true), axis=-1)
-    return K.clip(err, -1.0, 1.0)
 
 def play(ql, env, buf, epsilon=0.0):
     terminal = False
@@ -49,7 +43,6 @@ def play(ql, env, buf, epsilon=0.0):
 parser = argparse.ArgumentParser()
 parser.add_argument('--games', type=int, default=10, help='Number of games played')
 parser.add_argument('--epsilon', type=float, default=0, help='Epsilon value, probability of a random action')
-parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate for Adam Optimizer')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
 parser.add_argument('--gamma', type=float, default=0.99, help='Gamma for Q-Learning steps')
 
@@ -90,8 +83,7 @@ with tf.Graph().as_default():
 
     main = nn(network_input_shape, n_actions)
     target = nn(network_input_shape, n_actions)
-    adam = Adam(lr=args.learning_rate)
-    main.compile(optimizer=adam, loss=clipped_mse)
+    main.compile(optimizer='rmsprop', loss='mse')
 
     saver = tf.train.Saver()
     load_checkpoint(saver, args.checkpoint_dir, sess)
