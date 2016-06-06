@@ -28,9 +28,8 @@ def clipped_mse(y_true, y_pred):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--total_steps', type=int, default=5000000, help='Number of total training steps')
-parser.add_argument('--exploration_steps', type=int, default=1000000, help='Number of exploration steps (with epsilon decay')
-parser.add_argument('--epsilon_start', type=float, default=1.0, help='Epsilon decay start value')
-parser.add_argument('--epsilon_end', type=float, default=0.1, help='Epsilon decay end value')
+parser.add_argument('--exploration_steps', type=int, default=1000000, help='Number of exploration steps with epsilon=1.0')
+parser.add_argument('--epsilon', type=float, default=0.1, help='Fixed epsilon value after exploration phase')
 
 parser.add_argument('--learning_rate', type=float, default=0.00025, help='Learning rate for Adam Optimizer')
 parser.add_argument('--batch_size', type=int, default=32, help='Number of states to train on each step')
@@ -68,6 +67,7 @@ gym_env.seed(args.seed)
 network_input_shape = (args.history_window, args.height, args.width)
 n_actions = gym_env.action_space.n
 observation_shape = gym_env.observation_space.shape
+epsilon = 1.0
 
 with tf.Graph().as_default():
     config = tf.ConfigProto()
@@ -76,20 +76,15 @@ with tf.Graph().as_default():
     K.set_session(sess)
 
     t = tf.Variable(0, trainable=False, name='step')
-    epsilon = tf.Variable(args.epsilon_start, trainable=False, name='epsilon')
-    epsilon_decay = tf.assign(epsilon,
-            tf.select(t > args.exploration_steps,
-                args.epsilon_end,
-                args.epsilon_start - tf.cast(t / args.exploration_steps, tf.float32)))
     incr_t = tf.assign_add(t, 1)
 
     main = nn(network_input_shape, n_actions)
     target = nn(network_input_shape, n_actions)
-    adam = Adam(lr=args.learning_rate)
+    adam = Adam(lr=args.learning_rate, epsilon=0.1)
     main.compile(optimizer=adam, loss=clipped_mse)
 
     # compile initializes the network vars
-    sess.run(tf.initialize_variables([t, epsilon]))
+    sess.run(tf.initialize_variables([t]))
 
     # TODO: Figure out why after a lot of steps the meta
     # file becomes so large, for now set max_to_keep=1.
@@ -134,7 +129,7 @@ with tf.Graph().as_default():
             taken = time.time() - t0
             print("************************")
             print("Episode {}".format(episode_n))
-            print("total reward = {}".format(episode_reward))
+            print("Total reward = {}".format(episode_reward))
             print("Number of actions = {}".format(episode_len))
             print("Time taken = {:.2f} seconds".format(taken))
 
@@ -144,11 +139,11 @@ with tf.Graph().as_default():
             t0 = time.time()
             obs = noop_start(env, replay, buf)
 
-        sess.run(epsilon_decay)
-        eps_val = sess.run(epsilon)
+        if t_val > args.exploration_steps:
+            epsilon = args.epsilon
 
         buf.add(obs)
-        action = ql.predict_action(buf.state, eps_val)
+        action = ql.predict_action(buf.state, epsilon)
         obs_next, reward, terminal, _ = env.step(action)
         replay.add((obs, action, reward, terminal))
         if reward != 0:
@@ -169,6 +164,5 @@ with tf.Graph().as_default():
 
         if t_val % args.save_model_freq == 0 and args.checkpoint_dir:
             save_checkpoint(saver, args.checkpoint_dir, sess, t)
-            print("Epsilon status =  {:.3f}".format(eps_val))
 
     sess.close()

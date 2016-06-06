@@ -37,7 +37,11 @@ class DDQN:
         next_target_qvals = self.target.predict_on_batch(b_next_obs)
         a_max = np.argmax(next_main_qvals, axis=1)
         y = self.main.predict_on_batch(b_obs)
-        y[range(batch_size), b_action] = b_reward + ~b_terminal * (self.gamma * next_target_qvals[range(batch_size), a_max])
+        for i in range(batch_size):
+            if b_terminal[i]:
+                y[i, b_action[i]] = b_reward[i] 
+            else:
+                y[i, b_action[i]] = b_reward[i] * (self.gamma * next_target_qvals[i, a_max[i]])
         self.main.train_on_batch(b_obs, y)
 
     def update_target_weights(self):
