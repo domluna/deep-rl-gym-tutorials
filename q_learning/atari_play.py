@@ -9,8 +9,9 @@ from keras.optimizers import Adam
 from agents import DDQN
 from memory import SimpleExperienceReplay, Buffer
 from models import duel_atari_cnn as nn
-from environments import Env
+from envs import Env
 from utils import *
+from collections import Counter
 
 import gym
 import numpy as np
@@ -27,6 +28,7 @@ def play(ql, env, buf, epsilon=0.0):
     terminal = False
     episode_reward = 0
     t = 0
+    actions_count = Counter()
     buf.reset()
     obs = env.reset()
     buf.add(obs)
@@ -36,11 +38,13 @@ def play(ql, env, buf, epsilon=0.0):
         action = ql.predict_action(buf.state, epsilon)
         obs, reward, terminal, _ = env.step(action)
         buf.add(obs)
+        actions_count[action] += 1
         if reward != 0:
             episode_reward += reward
         t += 1
 
     print("Episode Reward {}".format(episode_reward))
+    print("Action summary {}".format(actions_count))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--games', type=int, default=10, help='Number of games played')
