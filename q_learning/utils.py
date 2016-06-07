@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os
+import warnings
 
 from six.moves import range
 from skimage.color import rgb2gray
@@ -8,7 +9,9 @@ from skimage.transform import resize
 from skimage import img_as_ubyte
 
 def preprocess(observation, new_height, new_width):
-    return img_as_ubyte(resize(rgb2gray(observation), (new_height, new_width)))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        return img_as_ubyte(resize(rgb2gray(observation), (new_height, new_width)))
 
 def load_checkpoint(saver, dir, sess):
     ckpt = tf.train.get_checkpoint_state(dir)

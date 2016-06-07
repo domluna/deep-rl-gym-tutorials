@@ -75,10 +75,10 @@ with tf.Graph().as_default():
     t = tf.Variable(0, trainable=False, name='step')
     incr_t = tf.assign_add(t, 1)
 
-    main = nn(network_input_shape, n_actions)
-    target = nn(network_input_shape, n_actions)
+    main_model = nn(network_input_shape, n_actions)
+    target_model = nn(network_input_shape, n_actions, trainable=False)
     opt = RMSprop(lr=args.learning_rate, rho=args.decay_rate)
-    main.compile(optimizer=opt, loss='mse')
+    main_model.compile(optimizer=opt, loss='mse')
 
     # compile initializes the network vars
     sess.run(tf.initialize_variables([t]))
@@ -109,7 +109,7 @@ with tf.Graph().as_default():
         else:
             env.monitor.start(args.monitor_dir, force=True)
 
-    ql = DDQN(main, target, args.batch_size, n_actions, args.gamma)
+    ql = DDQN(main_model, target_model, args.batch_size, n_actions, args.gamma)
     ql.update_target_weights()
 
     terminal = False
