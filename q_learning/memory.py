@@ -81,13 +81,14 @@ class Buffer(object):
     """Rolling window of current state"""
     def __init__(self, history_window, observation_shape):
         self.size = history_window
-        self._state = np.zeros([1, history_window] + list(observation_shape), dtype=np.uint8)
+        self._state = np.zeros([1, history_window] + list(observation_shape), dtype=np.float32)
 
     def add(self, observation):
         """Shifts the observations to make room for the most recent one. 
         The most recent observation should be on the last index"""
         self._state[0, :self.size-1, ...] = self._state[0, 1:self.size, ...]
         self._state[0, self.size-1, ...] = observation
+        self._state[0, self.size-1, ...] /= 255
 
     def reset(self):
         self._state[...] = 0
