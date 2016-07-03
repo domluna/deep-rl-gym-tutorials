@@ -75,9 +75,9 @@ network_input_shape = (args.history_window, args.height, args.width)
 n_actions = gym_env.action_space.n
 observation_shape = gym_env.observation_space.shape
 
-with tf.Graph().as_default():
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+with tf.Graph().as_default() as g, tf.Session(config=config) as sess:
     sess = tf.Session(config=config)
     K.set_session(sess)
 

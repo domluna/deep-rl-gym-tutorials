@@ -6,7 +6,7 @@ from keras.layers import Convolution2D, Flatten, Input, Dense, Lambda
 from keras.models import Model
 from keras import backend as K
 
-def atari_cnn(input_shape, n_actions, trainable=True):
+def atari_cnn(input_shape, n_actions):
     """
     Follows the network architecture described in the 2015 Deepmind Nature paper.
 
@@ -15,17 +15,17 @@ def atari_cnn(input_shape, n_actions, trainable=True):
     """
 
     input = Input(shape=input_shape)
-    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu', trainable=True)(input)
-    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu', trainable=True)(x)
-    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu', trainable=True)(x)
+    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu')(input)
+    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu')(x)
+    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu')(x)
     x = Flatten()(x)
 
-    hidden = Dense(512, activation='relu', trainable=True)(x)
-    output = Dense(n_actions, trainable=True)(hidden)
+    hidden = Dense(512, activation='relu')(x)
+    output = Dense(n_actions)(hidden)
 
     return Model(input, output)
 
-def duel_atari_cnn(input_shape, n_actions, mode='mean', trainable=True):
+def duel_atari_cnn(input_shape, n_actions, mode='mean'):
     """
     Follows the network architecture described in the 2015 Deepmind Nature paper
     with the changes proposed in Dueling Network paper.
@@ -43,13 +43,13 @@ def duel_atari_cnn(input_shape, n_actions, mode='mean', trainable=True):
         raise ValueError("mode must be either 'mean' or 'max'")
 
     input = Input(shape=input_shape)
-    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu', trainable=True)(input)
-    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu', trainable=True)(x)
-    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu', trainable=True)(x)
+    x = Convolution2D(32, 8, 8, subsample=(4,4), activation='relu')(input)
+    x = Convolution2D(64, 4, 4, subsample=(2,2), activation='relu')(x)
+    x = Convolution2D(64, 3, 3, subsample=(1,1), activation='relu')(x)
     x = Flatten()(x)
 
-    x = Dense(512, activation='relu', trainable=True)(x)
-    x = Dense(n_actions+1, trainable=True)(x)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(n_actions+1)(x)
     output = agg(x)
 
     return Model(input, output)

@@ -66,9 +66,9 @@ n_actions = gym_env.action_space.n
 observation_shape = gym_env.observation_space.shape
 epsilon = 1.0
 
-with tf.Graph().as_default():
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+with tf.Graph().as_default() as g, tf.Session(config=config) as sess:
     sess = tf.Session(config=config)
     K.set_session(sess)
 
@@ -76,7 +76,7 @@ with tf.Graph().as_default():
     incr_t = tf.assign_add(t, 1)
 
     main_model = nn(network_input_shape, n_actions)
-    target_model = nn(network_input_shape, n_actions, trainable=False)
+    target_model = nn(network_input_shape, n_actions)
     opt = RMSprop(lr=args.learning_rate, rho=args.decay_rate)
     main_model.compile(optimizer=opt, loss='mse')
 
@@ -116,6 +116,8 @@ with tf.Graph().as_default():
     episode_reward = 0
     episode_n = 1
     actions_count = Counter()
+
+    g.finalize()
 
     # Resets env and does NOOP (0) actions
     obs = noop_start(env, replay, buf)
